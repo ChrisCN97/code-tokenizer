@@ -1,0 +1,17 @@
+python language-modeling/run_mlm.py \
+    --config_name roberta-base \
+    --tokenizer_name roberta-base \
+    --model_name_or_path roberta-base \
+    --train_file data/java/valid.txt \
+    --validation_file data/java/valid.txt \
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 8 \
+    --do_train \
+    --do_eval \
+    --line_by_line \
+    --output_dir model/test \
+    --seed 123456 \
+    --max_train_samples 1000 \
+    --max_eval_samples 1000 \
+    --num_train_epochs 6 \
+    --overwrite_output_dir

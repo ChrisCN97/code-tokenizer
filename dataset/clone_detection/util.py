@@ -4,11 +4,12 @@ import random
 import shutil
 import matplotlib.pyplot as plt
 import numpy as np
+from method.pretrain.data.rules import java
 
 CODENET_PATH = "/mnt/sda/cn/python/codeBert/codeNet/Project_CodeNet/data"
 
 def code_preprocess(code_content):
-    return " ".join(code_content.split())
+    return java(code_content)
 
 def find_qualified_problem(MIN_SIZE, langs_need, q_need, code_len_min, code_len_max, limit=-1):
     p_list = os.listdir(CODENET_PATH)
@@ -365,6 +366,13 @@ def symbol_process(code, sym_list):
         code = " ".join(code.split())
     return code
 
+def symbol_process_random(code, sym_list, threshold = 0.5):
+    for symbol in sym_list:
+        for idx, c in enumerate(code):
+            if c == symbol and random.random() < threshold:
+                code = code[:idx] + " " + code[idx+1:]
+        code = " ".join(code.split())
+    return code
 
 def remove_symbol_for_list(lang, source_name_list, target_data_JSON="data_wo_symbol.jsonl", file="remove_symbol.txt"):
     url_to_code = get_url2code(lang)
@@ -380,7 +388,24 @@ def remove_symbol_for_list(lang, source_name_list, target_data_JSON="data_wo_sym
     data_jsonl_list = []
     for idx, code in url_to_code.items():
         data_jsonl_list.append({"func": code, "idx": idx})
-    gen_data_jsonl(data_jsonl_list, "Java", target_data_JSON)
+    gen_data_jsonl(data_jsonl_list, lang, target_data_JSON)
+
+
+def custom_for_list(lang, source_name_list, target_data_JSON="data_custom.jsonl"):
+    url_to_code = get_url2code(lang)
+
+    for source_name in source_name_list:
+        with open(os.path.join(lang, source_name + ".txt"), 'r') as f:
+            for line in f:
+                line = line.strip().split()
+                url_to_code[line[0]] = java(url_to_code[line[0]])
+                url_to_code[line[1]] = java(url_to_code[line[1]])
+
+    data_jsonl_list = []
+    for idx, code in url_to_code.items():
+        data_jsonl_list.append({"func": code, "idx": idx})
+    gen_data_jsonl(data_jsonl_list, lang, target_data_JSON)
+
 
 if __name__ == '__main__':
     MIN_SIZE = 690
@@ -397,11 +422,14 @@ if __name__ == '__main__':
     #          'Kotlin', 'Lua', 'Erlang', 'Standard ML', 'Bf', 'Prolog', 'Crystal', 'Nim', 'Ruby', 'D', 'Pascal', 'Forth',
     #          'Go', 'C++', 'Cython', 'Bash']
 
-    # for size in [300]:
-    #     gen_train(lang="Go", size=size)
+    # for size in [100, 1000]:
+    #     gen_train(lang="BCB", size=size)
     # process_BCBs()
     # check_trainrepeat_pnrate(lang, name="train_5000.txt")
     # get_data_list(level=1, lang="SC")
     # addApiInfoForList("Java", ["train_100", "dev_400", "test_1000"])
-    remove_symbol_for_list("Java", ["train_100", "dev_400", "test_1000"])
-    check_example(lang="Java", name="train_100.txt", map_name="data_wo_symbol.jsonl")
+    lang = "BCB"
+    gen_train(lang=lang, size=500)
+    remove_symbol_for_list(lang, ["train_500", "dev_400", "test_1000"])
+    custom_for_list(lang, ["train_500", "dev_400", "test_1000"])
+    check_example(lang=lang, name="train_500.txt", map_name="data_wo_symbol.jsonl")

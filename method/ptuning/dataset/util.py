@@ -99,4 +99,4 @@ if __name__ == "__main__":
     #         gen_dataset(lang="Go", size=str(size))
     # gen_dataset(lang="Go", size=str(5000))
     # gen_dataset(lang="Java", size=str(100))
-    gen_dataset(lang="Java", size=str(100), suffix="_wosym", dataJSON="data_wo_symbol.jsonl")
+    gen_dataset(lang="Java", size=str(100), suffix="_custom", dataJSON="data_custom.jsonl")

@@ -4,6 +4,7 @@ import random
 import re
 import shutil
 from tqdm import tqdm
+from method.pretrain.data.rules import java
 
 
 def gen_dataset(lang, folder, min_code_len, max_code_len):
@@ -188,6 +189,13 @@ def symbol_process(code, sym_list):
         code = " ".join(code.split())
     return code
 
+def symbol_process_random(code, sym_list, threshold = 0.5):
+    for symbol in sym_list:
+        for idx, c in enumerate(code):
+            if c == symbol and random.random() < threshold:
+                code = code[:idx] + " " + code[idx+1:]
+        code = " ".join(code.split())
+    return code
 
 def remove_symbol_for_list(lang, source_name_list, target_data_JSON="data_wo_symbol.jsonl", file="remove_symbol.txt"):
     url_to_code = get_url2code(lang)
@@ -202,7 +210,24 @@ def remove_symbol_for_list(lang, source_name_list, target_data_JSON="data_wo_sym
     data_jsonl_list = []
     for idx, code in url_to_code.items():
         data_jsonl_list.append({"func": code, "idx": idx})
-    gen_data_jsonl(data_jsonl_list, "Java", target_data_JSON)
+    gen_data_jsonl(data_jsonl_list, lang, target_data_JSON)
+
+
+def custom_for_list(lang, source_name_list, target_data_JSON="data_custom.jsonl"):
+    url_to_code = get_url2code(lang)
+
+    for source_name in source_name_list:
+        with open(os.path.join(lang, source_name + ".txt"), 'r') as f:
+            for line in f:
+                line = line.strip().split()
+                url_to_code[line[0]] = java(url_to_code[line[0]])
+                url_to_code[line[1]] = java(url_to_code[line[1]])
+
+    data_jsonl_list = []
+    for idx, code in url_to_code.items():
+        data_jsonl_list.append({"func": code, "idx": idx})
+    gen_data_jsonl(data_jsonl_list, lang, target_data_JSON)
+
 
 if __name__ == "__main__":
     # check_example(lang="Java", name="train.txt")
@@ -212,5 +237,8 @@ if __name__ == "__main__":
     #     gen_train(lang="Go", size=size)
     # gen_dataset(lang="javascript", folder="JavaScript", min_code_len=700, max_code_len=900)
     # addApiInfoForList("Java", ["train_100", "dev_400", "test_1000"])
-    # remove_symbol_for_list("Java", ["train_100", "dev_400", "test_1000"])
-    check_example(lang="Java", name="train_100.txt")  # , map_name="data_wo_symbol.jsonl"
+    lang = "Java"
+    gen_train(lang=lang, size=500)
+    remove_symbol_for_list(lang, ["train_500", "dev_400", "test_1000"])
+    custom_for_list(lang, ["train_500", "dev_400", "test_1000"])
+    check_example(lang=lang, name="train_500.txt", map_name="data_wo_symbol.jsonl")

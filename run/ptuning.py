@@ -131,7 +131,7 @@ def gen_list(task_dicts, env, check_data=False):
     if env == S1:
         print("conda activate ptuning")
     if env == S3:
-        print("conda activate allennlp")
+        print("/mnt/sda/cn/zeroshot/run\nconda activate pretrain_cuinan")
     print("nohup ./run.sh > output/{}/ptuning/log/task_list.log 2>&1 &".format(task_dicts[0]["task_name"]))
     h, m = divmod(pre_time, 60)
     print("%dh %02dmin" % (h, m))
@@ -161,16 +161,17 @@ def get_local_model_name(task, name):
     return os.path.join("output", task, "ptuning", name, "p10-i0")
 
 if __name__ == "__main__":
-    model_list = ["microsoft/codebert-base", "roberta-base"]
+    model_list = ["microsoft/codebert-base", "roberta-base", "/mnt/sda/cn/zeroshot/method/pretrain/model/roberta_java_custom"]
     task_dicts = []
     task_list = ["clone_detection", "code_search", "name_predict"]
-    # for size in ["1000", "1000_api"]:
-    #     task_dicts.append(
-    #         {"task_name": task_list[1], "lang": "Java", "size": size,
-    #          "model": model_list[0], "max_step": 2000, "eval_step": 100,
-    #          "output": "Java_{}".format(size), "do_train": True, "zeroshot": False})
     task_dicts.append(
-        {"task_name": task_list[2], "lang": "Java", "size": "100_wosym", "max_step": 1000, "eval_step": 100,
-         "model": model_list[0], "output": "Java_100_wosym", "do_train": True, "zeroshot": False})
+        {"task_name": task_list[0], "lang": "Java", "size": "100_custom", "max_step": 1000, "eval_step": 100,
+         "model": model_list[2], "output": "Java_100_pretrain", "do_train": True, "zeroshot": False})
+    task_dicts.append(
+        {"task_name": task_list[1], "lang": "Java", "size": "1000_custom", "max_step": 2000, "eval_step": 100,
+         "model": model_list[2], "output": "Java_100_pretrain", "do_train": True, "zeroshot": False})
+    # task_dicts.append(
+    #     {"task_name": task_list[2], "lang": "Java", "size": "100_custom", "max_step": 1000, "eval_step": 100,
+    #      "model": model_list[2], "output": "Java_100_pretrain", "do_train": True, "zeroshot": False})
     gen_list(task_dicts, S3, check_data=False)
-    # s3 471698 output/name_predict/ptuning/log/task_list.log 10:00
+    # s3 1540254 output/clone_detection/ptuning/log/task_list.log 18:00

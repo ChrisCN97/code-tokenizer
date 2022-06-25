@@ -8,13 +8,12 @@ train_config = {
     "test": [2, 4],
     100: [100,100],
     300: [35,100],
-    # 300: [58,100],
     500: [20,100],
     700: [20,100],
     1000: [20,100],
+    2000: [20,100],
     3000: [20,100],
     5000: [20,200],
-    # 5000: [33,200],
     7000: [20,200],
     10000: [20,200]
 }
@@ -41,7 +40,7 @@ def finetune(
         do_target_train=False
 ):
     cmd = "python ../method/finetune/code/run.py " \
-          "--block_size 250 " \
+          "--block_size 512 " \
           "--eval_batch_size 32 " \
           "--max_grad_norm 1.0 " \
           "--evaluate_during_training " \
@@ -106,8 +105,14 @@ def gen_list(task_dicts, env, check_data=False):
     cmd = ""
     pre_time = 0
     for task in task_dicts:
-        task["epoch"] = train_config[task["size"]][0]
-        task["eval_step"] = train_config[task["size"]][1]
+        if task["size"] != "test":
+            size_num = int(task["size"].split("_")[0])
+        else:
+            size_num = "test"
+        if "epoch" not in task:
+            task["epoch"] = train_config[size_num][0]
+        if "eval_step" not in task:
+            task["eval_step"] = train_config[size_num][1]
         if "target_output_dir" not in task:
             task["target_output_dir"] = None
             task["do_target_train"] = False
@@ -132,7 +137,7 @@ def gen_list(task_dicts, env, check_data=False):
             if task["size"] == "test":
                 pre_time += 0
             else:
-                pre_time += int(task["epoch"])*int(task["size"])/10*0.011
+                pre_time += int(task["epoch"])*size_num/10*0.011
         else:
             pre_time += 0.633
     print(cmd)
@@ -142,7 +147,7 @@ def gen_list(task_dicts, env, check_data=False):
     if env == S1:
         print("conda activate ptuning")
     if env == S3:
-        print("conda activate allennlp")
+        print("/mnt/sda/cn/zeroshot/run\nconda activate pretrain_cuinan")
     print("nohup ./run.sh > output/{}/finetune/log/task_list.log 2>&1 &".format(task_dicts[0]["task_name"]))
     h, m = divmod(pre_time, 60)
     print("%dh %02dmin" % (h, m))
@@ -153,24 +158,28 @@ def get_local_model_name(task, name):
 if __name__ == "__main__":
     # need test source domain
     task_dicts = []
-    model_list = ["microsoft/codebert-base", "roberta-base", "huggingface/CodeBERTa-small-v1", "roberta-large"]
-    task_list = ["clone_detection", "code_search", "name_predict"]
-    for task in task_list:
-        if task in task_list[1:]:
-            task_dicts.append({"task_name": task, "lang": "Java", "size": 5000, "model": model_list[0],
-                               "output": "Java_5000", "do_train": True, "do_test": False})
-            task_dicts.append({"task_name": task, "lang": "Java", "size": 5000, "model": model_list[0],
-                               "output": "Java_5000", "do_train": False, "do_test": True})
-        for lang in ["SC", "Go"]:
-            for size in [32, 100, 300, 500, 700]:
-                output = "Java_5000"
-                if task == task_list[0]:
-                    output += "_2"
-                task_dicts.append({"task_name": task, "lang": lang, "size": size, "model": model_list[0],
-                                   "output": output, "do_train": False, "do_test": False,
-                                   "do_target_train": True, "target_output_dir": "{}_{}_{}".format(output, lang, size)})
-                task_dicts.append({"task_name": task, "lang": lang, "size": size, "model": model_list[0],
-                                   "output": "{}_{}_{}".format(output, lang, size), "do_train": False, "do_test": True})
-    gen_list(task_dicts, S1, check_data=False)
-    # s1 30967 output/clone_detection/finetune/log/task_list.log
+    model_list = [
+        ("microsoft/codebert-base", ""),
+        # ("/mnt/sda/cn/zeroshot/method/pretrain/model/roberta_java", ""),
+        # ("/mnt/sda/cn/zeroshot/method/pretrain/model/roberta_java_woSymbol", "_wosym"),
+        # ("/mnt/sda/cn/zeroshot/method/pretrain/model/roberta_java_custom", "_custom"),
+        # ("/mnt/sda/cn/zeroshot/method/pretrain/model/roberta_java_custom_fz", "_custom")
+    ]
+    task_list = [
+        ("clone_detection", 500, "BCB"),
+        # ("clone_detection", 500, "Java"),
+        # ("clone_detection", 1000, "BCB"),
+        # ("clone_detection", 1000, "Java"),
+        # ("code_search", 500, "CSN"),
+        # ("code_search", 500, "Java"),
+        # ("name_predict", 500, "Java"),
+    ]
+    for model, suffix in model_list:
+        for task, size, lang in task_list:
+            task_dicts.append({"task_name": task, "lang": lang, "size": "{}{}".format(size, suffix), "model": model,
+                               "output": "{}_{}{}".format(lang, size, suffix), "do_train": True, "do_test": False})
+            task_dicts.append({"task_name": task, "lang": lang, "size": "{}{}".format(size, suffix), "model": model,
+                               "output": "{}_{}{}".format(lang, size, suffix), "do_train": False, "do_test": True})
+    gen_list(task_dicts, S3, check_data=False)
+    # s3 2853217 output/clone_detection/finetune/log/task_list.log 1.08
 
