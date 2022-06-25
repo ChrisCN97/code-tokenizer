@@ -13,8 +13,8 @@ class RobertaClassificationHead(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(config.hidden_size*2, config.hidden_size)  # 分开
-        # self.dense = nn.Linear(config.hidden_size, config.hidden_size)  # 合并
+        # self.dense = nn.Linear(config.hidden_size*2, config.hidden_size)  # 分开
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)  # 合并
         self.dense.weight.data.normal_(0, 0.1)  # new add
         # self.ln = nn.LayerNorm(config.hidden_size)  # new
         l2n = int(config.hidden_size/2)
@@ -24,7 +24,7 @@ class RobertaClassificationHead(nn.Module):
 
     def forward(self, features, **kwargs):
         x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
-        x = x.reshape(-1,x.size(-1)*2)  # 分开
+        # x = x.reshape(-1,x.size(-1)*2)  # 分开
         x = self.dropout(x)
         x = self.dense(x)
         # x = self.ln(x)  # new
@@ -46,9 +46,10 @@ class Model(nn.Module):
         self.args=args
     
         
-    def forward(self, input_ids=None,labels=None): 
-        input_ids=input_ids.view(-1,self.args.block_size)  # 分开
-        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(1))[0]
+    def forward(self, input_ids=None, labels=None, token_group=None):
+        # input_ids=input_ids.view(-1,self.args.block_size)  # 分开
+        # todo cuinan group embedding process
+        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(1), token_group=token_group)[0]
         logits=self.classifier(outputs)
         prob=F.softmax(logits)
         if labels is not None:

@@ -59,7 +59,7 @@ MODEL_CLASSES = {
     'gpt2': (GPT2Config, GPT2LMHeadModel, GPT2Tokenizer),
     'openai-gpt': (OpenAIGPTConfig, OpenAIGPTLMHeadModel, OpenAIGPTTokenizer),
     'bert': (BertConfig, BertForMaskedLM, BertTokenizer),
-    'roberta': (RobertaConfig, RobertaModel, RobertaTokenizer),
+    'roberta': (RobertaConfig, RobertaModel, RobertaTokenizer),  # todo cuinan new RobertaModel RobertaTokenizer
     'distilbert': (DistilBertConfig, DistilBertForMaskedLM, DistilBertTokenizer)
 }
 
@@ -93,7 +93,8 @@ class InputFeatures(object):
                  label,
                  url1,
                  url2,
-                 code
+                 code,
+                 group
 
     ):
         self.input_tokens = input_tokens
@@ -102,28 +103,53 @@ class InputFeatures(object):
         self.url1=url1
         self.url2=url2
         self.code=code
+        self.group=group
         
 def convert_examples_to_features(code1_tokens,code2_tokens,label,url1,url2,tokenizer,args,cache,code1s,code2s):
+    code1_group = code1_tokens[1]
+    code1_tokens = code1_tokens[0]
+    code2_group = code2_tokens[1]
+    code2_tokens = code2_tokens[0]
+
+    block_size = args.block_size - 1
+    code1_len = len(code1_tokens) + 2
+    code2_len = len(code2_tokens) + 1
+    if code1_len + code2_len <= block_size:
+        code1_size = code1_len
+        code2_size = code2_len
+    else:
+        code1_size = int(code1_len * block_size / (code1_len+code2_len))
+        if code1_size == 0:
+            code1_size = code1_len
+        code2_size = int(code2_len * block_size / (code1_len + code2_len))
+    padding_length = args.block_size - code1_size - code2_size + 1
+    code2_size += padding_length
+
     #source
-    code1_tokens=code1_tokens[:args.block_size-2]
+    code1_tokens=code1_tokens[:code1_size-2]
     code1_tokens =[tokenizer.cls_token]+code1_tokens+[tokenizer.sep_token]
-    code2_tokens=code2_tokens[:args.block_size-2]  # 分开
-    code2_tokens =[tokenizer.cls_token]+code2_tokens+[tokenizer.sep_token]  # 分开
-    # code2_tokens = code2_tokens[:args.block_size - 1]  # 合并
-    # code2_tokens = code2_tokens + [tokenizer.sep_token]  # 合并
+    code1_group = [0]+code1_group[:code1_size-2]+[0]
+    # code2_tokens=code2_tokens[:args.block_size-2]  # 分开
+    # code2_tokens =[tokenizer.cls_token]+code2_tokens+[tokenizer.sep_token]  # 分开
+    code2_tokens = code2_tokens[:code2_size - 2]  # 合并
+    code2_tokens = code2_tokens + [tokenizer.sep_token, tokenizer.pad_token] # 合并
+    code2_group = code2_group[:code2_size - 2] + [0, 0]
     
     code1_ids=tokenizer.convert_tokens_to_ids(code1_tokens)
-    padding_length = args.block_size - len(code1_ids)
+    padding_length = code1_size - len(code1_ids)
     code1_ids+=[tokenizer.pad_token_id]*padding_length
+    code1_group += [0]*padding_length
     
     code2_ids=tokenizer.convert_tokens_to_ids(code2_tokens)
-    padding_length = args.block_size - len(code2_ids)
+    padding_length = code2_size - len(code2_ids)
     code2_ids+=[tokenizer.pad_token_id]*padding_length
+    code2_group += [0] * padding_length
     
     source_tokens=code1_tokens+code2_tokens
     source_ids=code1_ids+code2_ids
     code=code1s+"\n"+code2s
-    return InputFeatures(source_tokens,source_ids,label,url1,url2,code)
+    group = code1_group + code2_group
+    return InputFeatures(source_tokens,source_ids,label,url1,url2,code,group)
 
 class TextDataset(Dataset):
     def __init__(self, tokenizer, args, file_path='folder', evaluate=False, test=False, pool=None):
@@ -174,7 +200,7 @@ class TextDataset(Dataset):
 
     def __getitem__(self, item):
         
-        return torch.tensor(self.examples[item].input_ids),torch.tensor(self.examples[item].label)
+        return torch.tensor(self.examples[item].input_ids), torch.tensor(self.examples[item].label), torch.tensor(self.examples[item].group)
 
 
 def load_and_cache_examples(args, tokenizer, evaluate=False, test=False, pool=None):
@@ -283,9 +309,10 @@ def train(args, train_dataset, model, tokenizer,pool):
         train_loss=0
         for step, batch in enumerate(bar):
             inputs = batch[0].to(args.device)        
-            labels=batch[1].to(args.device) 
+            labels=batch[1].to(args.device)
+            token_group = batch[2].to(args.device)  # todo cuinan group
             model.train()
-            loss,logits = model(inputs,labels)
+            loss,logits = model(inputs, labels, token_group)
 
 
             if args.n_gpu > 1:
@@ -375,9 +402,10 @@ def evaluate(args, model, tokenizer, prefix="",pool=None,eval_when_training=Fals
     y_trues=[]
     for batch in tqdm(eval_dataloader, total=len(eval_dataloader)):
         inputs = batch[0].to(args.device)        
-        labels=batch[1].to(args.device) 
+        labels=batch[1].to(args.device)
+        token_group = batch[2].to(args.device)  # todo cuinan group
         with torch.no_grad():
-            lm_loss,logit = model(inputs,labels)
+            lm_loss,logit = model(inputs,labels,token_group)
             eval_loss += lm_loss.mean().item()
             logits.append(logit.cpu().numpy())
             y_trues.append(labels.cpu().numpy())
@@ -445,9 +473,10 @@ def test(args, model, tokenizer, prefix="",pool=None,best_threshold=0.5):
     y_trues=[]
     for batch in tqdm(eval_dataloader, total=len(eval_dataloader)):
         inputs = batch[0].to(args.device)        
-        labels=batch[1].to(args.device) 
+        labels=batch[1].to(args.device)
+        token_group = batch[2].to(args.device)  # todo cuinan group
         with torch.no_grad():
-            lm_loss,logit = model(inputs,labels)
+            lm_loss,logit = model(inputs, labels, token_group)
             eval_loss += lm_loss.mean().item()
             logits.append(logit.cpu().numpy())
             y_trues.append(labels.cpu().numpy())
