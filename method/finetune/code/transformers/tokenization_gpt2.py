@@ -232,7 +232,7 @@ class GPT2Tokenizer(PreTrainedTokenizer):
     def _tokenize(self, text):
         """ Tokenize a string. """
         bpe_tokens = []
-        token_group = []  # todo 0: single world; 1,2,3...: group
+        token_group = []  # todo cuinan: 0: single world; 1,2,3...: group
         idx = 1
         for token in re.findall(self.pat, text):
             token = "".join(
