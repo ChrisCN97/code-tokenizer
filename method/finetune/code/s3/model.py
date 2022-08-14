@@ -44,12 +44,22 @@ class Model(nn.Module):
         self.tokenizer=tokenizer
         self.classifier=RobertaClassificationHead(config)
         self.args=args
+        self.hidden_size = config.hidden_size
+        self.lstm_model.lstm_head = torch.nn.LSTM(input_size=self.hidden_size,
+                                       hidden_size=self.hidden_size,
+                                       num_layers=2,
+                                       bidirectional=True,
+                                       batch_first=True)
+        self.lstm_model.mlp_head = nn.Sequential(nn.Linear(2 * self.hidden_size, self.hidden_size),
+                                      nn.ReLU(),
+                                      nn.Linear(self.hidden_size, self.hidden_size))
     
         
     def forward(self, input_ids=None, labels=None, token_group=None):
         # input_ids=input_ids.view(-1,self.args.block_size)  # 分开
         # todo group embedding process
-        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(1), token_group=token_group)[0]
+        outputs = self.encoder(input_ids=input_ids, attention_mask=input_ids.ne(1),
+                               token_group=token_group, lstm_model=self.lstm_model)[0]
         logits=self.classifier(outputs)
         prob=F.softmax(logits)
         if labels is not None:

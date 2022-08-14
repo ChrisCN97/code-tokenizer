@@ -166,12 +166,12 @@ if __name__ == "__main__":
         # ("/mnt/sda/cn/zeroshot/method/pretrain/model/roberta_java_custom_fz", "_custom")
     ]
     task_list = [
-        ("clone_detection", 500, "BCB"),
+        # ("clone_detection", 500, "BCB"),
         # ("clone_detection", 500, "Java"),
         # ("clone_detection", 1000, "BCB"),
         # ("clone_detection", 1000, "Java"),
-        # ("code_search", 500, "CSN"),
-        # ("code_search", 500, "Java"),
+        ("code_search", 500, "CSN"),
+        ("code_search", 500, "Java"),
         # ("name_predict", 500, "Java"),
     ]
     for model, suffix in model_list:
@@ -181,5 +181,5 @@ if __name__ == "__main__":
             task_dicts.append({"task_name": task, "lang": lang, "size": "{}{}".format(size, suffix), "model": model,
                                "output": "{}_{}{}".format(lang, size, suffix), "do_train": False, "do_test": True})
     gen_list(task_dicts, S3, check_data=False)
-    # s3 2853217 output/clone_detection/finetune/log/task_list.log 1.08
+    # s3 3060292 output/code_search/finetune/log/task_list.log 11:10
 

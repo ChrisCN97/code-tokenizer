@@ -680,6 +680,7 @@ class BertModel(BertPreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         token_group=None,
+        lstm_model=None,
     ):
         r"""
     Return:
@@ -770,7 +771,7 @@ class BertModel(BertPreTrainedModel):
                 q = p+1
                 while q < size and group[q] == group[q-1]:
                     q += 1
-                new_embedding[b][i] = f_ave(embs, p, q)
+                new_embedding[b][i] = f_lstm(embs, p, q, lstm_model)
                 i += 1
                 p = q
             while i < size:
@@ -803,6 +804,16 @@ def f_ave(embs, p, q):
     # average the embeddings to represent the group
     res = torch.mean(embs[p:q], 0)
     return res
+
+def f_lstm(embs, p, q, model):
+    # lstm for aggregating embeddings
+    replace_embeds = embs[p:q]
+    replace_embeds = replace_embeds.unsqueeze(0)
+    replace_embeds = model[0](replace_embeds)
+    replace_embeds = replace_embeds[1][0]  # [batch_size, seq_len, 2 * hidden_dim]
+    replace_embeds = torch.flatten(replace_embeds)
+    replace_embeds = model[1](replace_embeds)
+    return replace_embeds
 
 @add_start_docstrings(
     """Bert Model with two heads on top as done during the pre-training: a `masked language modeling` head and

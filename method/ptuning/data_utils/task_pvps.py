@@ -578,6 +578,7 @@ class WicPVP(PVP):
         return WicPVP.VERBALIZER[label]
 
 
+# todo cuinan: prompt gen
 class CloneDetPVP(PVP):
     VERBALIZER_A = {
         "False": ["No"],
